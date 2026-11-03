@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Static checks and coverage run once, on the Node version the dev tools target.
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run type-check
+      - run: npm run test:coverage
+
+  # The SDK itself supports every Node version from 18.
+  test:
+    name: test (${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20, 22, 24]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run build
+      # The packed tarball must load through both `import` and `require`.
+      - name: Pack and import
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          mkdir "$RUNNER_TEMP/app" && cd "$RUNNER_TEMP/app"
+          npm init -y >/dev/null
+          npm install --ignore-scripts "$RUNNER_TEMP"/nombaoss-nomba-node-*.tgz
+          node --input-type=module -e 'import Nomba, { verifyWebhook } from "@nombaoss/nomba-node"; if (typeof Nomba !== "function" || typeof verifyWebhook !== "function") process.exit(1);'
+          node -e 'const { Nomba, default: D } = require("@nombaoss/nomba-node"); if (typeof Nomba !== "function" || D !== Nomba) process.exit(1);'

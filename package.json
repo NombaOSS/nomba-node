@@ -1,0 +1,76 @@
+{
+  "name": "@nombaoss/nomba-node",
+  "version": "0.1.0",
+  "description": "Official-quality TypeScript/Node SDK for the Nomba payments API",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "nomba",
+    "payments",
+    "banking",
+    "transfers",
+    "checkout",
+    "nigeria",
+    "fintech",
+    "sdk"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NombaOSS/nomba-node.git"
+  },
+  "homepage": "https://github.com/NombaOSS/nomba-node",
+  "bugs": {
+    "url": "https://github.com/NombaOSS/nomba-node/issues"
+  },
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src test examples",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.19.43",
+    "@vitest/coverage-v8": "^3.2.7",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "express": "^5.3.0",
+    "prettier": "^3.9.10",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^3.2.7"
+  },
+  "overrides": {
+    "vite": "^6.3.5"
+  }
+}
