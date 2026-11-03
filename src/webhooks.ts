@@ -37,11 +37,18 @@ function field(v: unknown): string {
   return typeof v === "string" ? v : String(v as number);
 }
 
+/** Strict RFC 3339, e.g. `2025-09-29T10:51:44Z` or `2025-09-29T11:51:44.123+01:00`. */
+const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/** `responseCode` as signed: null, absent and the string "null" all become "". */
+function signedResponseCode(event: WebhookEvent): string {
+  const responseCode = field(event.data.transaction.responseCode);
+  return responseCode === "null" ? "" : responseCode;
+}
+
 /** The string Nomba signs, per https://developer.nomba.com/docs/api-basics/webhook */
 export function webhookSignedMessage(event: WebhookEvent, timestamp: string): string {
   const { merchant, transaction } = event.data;
-  let responseCode = field(transaction.responseCode);
-  if (responseCode === "null") responseCode = "";
   return [
     event.event_type,
     event.requestId,
@@ -50,7 +57,7 @@ export function webhookSignedMessage(event: WebhookEvent, timestamp: string): st
     field(transaction.transactionId),
     field(transaction.type),
     field(transaction.time),
-    responseCode,
+    signedResponseCode(event),
     timestamp,
   ].join(":");
 }
@@ -132,7 +139,20 @@ export function verifyWebhook(
     throw new WebhookVerificationError(`Unsupported signature algorithm "${algorithm}"`);
   }
 
+  // The signed fields are joined with ":" and the timestamp itself contains colons.
+  // Without these two checks an attacker holding one genuine webhook could move the
+  // front of the timestamp into responseCode (":2025-09-29T10" + "51:44Z") and keep
+  // the same HMAC input.
+  if (!RFC3339.test(timestamp)) {
+    throw new WebhookVerificationError(
+      "Invalid nomba-timestamp header: expected RFC 3339"
+    );
+  }
+
   const event = parseEvent(rawBody);
+  if (signedResponseCode(event).includes(":")) {
+    throw new WebhookVerificationError("Invalid data.transaction.responseCode");
+  }
 
   if (options.toleranceSeconds !== undefined) {
     const ts = Date.parse(timestamp);

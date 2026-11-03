@@ -423,6 +423,7 @@ app.post("/webhooks/nomba", express.raw({ type: "*/*" }), (req, res) => {
 
 - The signature is compared exactly (base64 is case-sensitive) and in constant time. Surrounding whitespace in the header is ignored.
 - `nomba-sig-value` is accepted if `nomba-signature` is absent. A `nomba-signature-algorithm` other than `HmacSHA256` is rejected.
+- `nomba-timestamp` must be an RFC 3339 time (for example `2025-09-29T10:51:44Z`), and a `responseCode` containing `:` is rejected. Both checks stop a forged webhook from moving part of the timestamp into the signed body.
 - `toleranceSeconds` (off by default) rejects events whose `nomba-timestamp` is more than that many seconds from now, which protects against replayed requests.
 
 Event types are exported as `WebhookEventType`: `payment_success`, `payment_failed`, `payment_reversal`, `payout_success`, `payout_failed`, `payout_refund`. Verification uses `node:crypto`, so it works in Node, Bun, Deno and edge runtimes with Node compatibility enabled.

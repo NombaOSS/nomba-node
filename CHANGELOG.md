@@ -15,5 +15,5 @@ All notable changes to this project are documented here. The format follows [Kee
 - `merchantTxRef` generated (UUID v4) for transfers and bill purchases when you don't pass one, and returned on the result. `checkout.chargeSavedCard` does the same with `order.orderReference`. Errors from these calls carry the reference as `err.reference`, so you can requery after a timeout.
 - Path parameter validation that rejects empty values, `.`, `..` and `/`.
 - Auto-paging async iterators: `transactions.listAll`, `transactions.filterAll`, `transactions.listAllBankTransactions`, `accounts.listAllTerminals` and `virtualAccounts.listAll`.
-- Webhook verification (`verifyWebhook`, `Nomba.webhooks.verify`) with exact, constant-time signature comparison and optional timestamp tolerance.
+- Webhook verification (`verifyWebhook`, `Nomba.webhooks.verify`) with exact, constant-time signature comparison, strict RFC 3339 `nomba-timestamp` checking and optional timestamp tolerance.
 - `TransactionStatus` and `WebhookEventType` constants.

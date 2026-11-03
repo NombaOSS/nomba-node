@@ -6,6 +6,7 @@ import Nomba, {
   WebhookEventType,
   WebhookVerificationError,
 } from "../src/index.js";
+import { webhookSignedMessage } from "../src/webhooks.js";
 import { client, MockApi } from "./helpers.js";
 
 const fixturePath = new URL("./fixtures/webhook-fixture.json", import.meta.url);
@@ -169,11 +170,77 @@ describe("webhook verification", () => {
       verifyWebhook(raw, headers(), KEY, { toleranceSeconds: 300, now: early })
     ).toThrow(/tolerance/);
     expect(() =>
-      verifyWebhook(raw, { ...headers(), "nomba-timestamp": "not a date" }, KEY, {
-        toleranceSeconds: 300,
-      })
+      verifyWebhook(
+        raw,
+        { ...headers(), "nomba-timestamp": "2025-13-45T99:99:99Z" },
+        KEY,
+        {
+          toleranceSeconds: 300,
+        }
+      )
     ).toThrow(/Invalid nomba-timestamp/);
   });
+
+  it("rejects the split-timestamp forgery even though the HMAC input is unchanged", () => {
+    const e = JSON.parse(raw);
+    e.data.transaction.responseCode = ":2025-09-29T10";
+    const forged = JSON.stringify(e);
+    const forgedTimestamp = "51:44Z";
+    // Same signed message as the genuine webhook, so the genuine signature matches.
+    expect(webhookSignedMessage(e, forgedTimestamp)).toBe(
+      webhookSignedMessage(JSON.parse(raw), TIMESTAMP)
+    );
+    const forgedHeaders = {
+      "nomba-signature": DOC_SIGNATURE,
+      "nomba-timestamp": forgedTimestamp,
+    };
+    expect(() => verifyWebhook(forged, forgedHeaders, KEY)).toThrow(
+      WebhookVerificationError
+    );
+    expect(() =>
+      verifyWebhook(forged, forgedHeaders, KEY, { toleranceSeconds: 300 })
+    ).toThrow(WebhookVerificationError);
+  });
+
+  it("rejects a responseCode containing a colon", () => {
+    const e = JSON.parse(raw);
+    e.data.transaction.responseCode = "00:01";
+    const body = JSON.stringify(e);
+    const sig = computeWebhookSignature(JSON.parse(body), TIMESTAMP, KEY);
+    expect(() => verifyWebhook(body, headers(sig), KEY)).toThrow(/responseCode/);
+  });
+
+  it.each([
+    "51:44Z",
+    "2025-09-29 10:51:44Z",
+    "2025-09-29T10:51:44",
+    "2025-09-29T10:51Z",
+    "1759143104",
+    "Mon, 29 Sep 2025 10:51:44 GMT",
+    "2025-09-29T10:51:44+0100",
+    " 2025-09-29T10:51:44Z",
+  ])("rejects malformed timestamp %j, with or without tolerance", (ts) => {
+    const e = JSON.parse(raw);
+    const sig = computeWebhookSignature(e, ts, KEY);
+    const h = { "nomba-signature": sig, "nomba-timestamp": ts };
+    expect(() => verifyWebhook(raw, h, KEY)).toThrow(/RFC 3339/);
+    expect(() =>
+      verifyWebhook(raw, h, KEY, {
+        toleranceSeconds: 1e9,
+        now: new Date(Date.parse(TIMESTAMP)),
+      })
+    ).toThrow(/RFC 3339/);
+  });
+
+  it.each(["2025-09-29T10:51:44.123Z", "2025-09-29T11:51:44+01:00"])(
+    "accepts RFC 3339 timestamp %j",
+    (ts) => {
+      const sig = computeWebhookSignature(JSON.parse(raw), ts, KEY);
+      expect(
+        verifyWebhook(raw, { "nomba-signature": sig, "nomba-timestamp": ts }, KEY)
+      ).toBeTruthy();
+    }
+  );
 
   it("ignores the timestamp age by default", () => {
     expect(verifyWebhook(raw, headers(), KEY)).toBeTruthy();
