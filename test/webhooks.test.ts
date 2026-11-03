@@ -13,12 +13,13 @@ const rawBytes = readFileSync(fixturePath);
 const raw = rawBytes.toString("utf8");
 const KEY = "SampleSignatureKey123";
 const TIMESTAMP = "2025-09-29T10:51:44Z";
-// HMAC-SHA256 of the fixture computes to the lower-case "q" form. The upper-case
-// variant differs only in letter case and must verify too (Nomba compares
-// case-insensitively).
-const COMPUTED_SIGNATURE = "q30yFZDyykoymBf9+mt1wz5UAuLk57raPGPHlGzIv00=";
-const UPPER_SIGNATURE = "Q30yFZDyykoymBf9+mt1wz5UAuLk57raPGPHlGzIv00=";
-const DOC_SIGNATURE = COMPUTED_SIGNATURE;
+// Nomba's documented signature for the fixture. HMAC-SHA256 computes exactly
+// this value (first byte 0x71, lower-case "q").
+const DOC_SIGNATURE = "q30yFZDyykoymBf9+mt1wz5UAuLk57raPGPHlGzIv00=";
+const COMPUTED_SIGNATURE = DOC_SIGNATURE;
+// Same value with the first letter's case flipped: base64 is case-sensitive,
+// so this is a different signature and must be rejected.
+const CASE_CHANGED_SIGNATURE = "Q30yFZDyykoymBf9+mt1wz5UAuLk57raPGPHlGzIv00=";
 
 type Ev = {
   event_type?: unknown;
@@ -35,7 +36,9 @@ const headers = (sig = DOC_SIGNATURE, extra: Record<string, string> = {}) => ({
 describe("webhook verification", () => {
   it("computes the exact documented signature", () => {
     const event = JSON.parse(raw);
-    expect(computeWebhookSignature(event, TIMESTAMP, KEY)).toBe(COMPUTED_SIGNATURE);
+    const sig = computeWebhookSignature(event, TIMESTAMP, KEY);
+    expect(sig).toBe(COMPUTED_SIGNATURE);
+    expect(sig.charCodeAt(0)).toBe(0x71);
   });
 
   it("accepts the documented signature", () => {
@@ -46,8 +49,18 @@ describe("webhook verification", () => {
     );
   });
 
-  it("accepts the signature in a different letter case", () => {
-    expect(() => verifyWebhook(raw, headers(UPPER_SIGNATURE), KEY)).not.toThrow();
+  it("rejects the documented signature with its letter case changed", () => {
+    expect(CASE_CHANGED_SIGNATURE.toLowerCase()).toBe(DOC_SIGNATURE.toLowerCase());
+    expect(() => verifyWebhook(raw, headers(CASE_CHANGED_SIGNATURE), KEY)).toThrow(
+      /does not match/
+    );
+    expect(() => verifyWebhook(raw, headers(DOC_SIGNATURE.toUpperCase()), KEY)).toThrow(
+      WebhookVerificationError
+    );
+  });
+
+  it("ignores surrounding whitespace in the signature header", () => {
+    expect(() => verifyWebhook(raw, headers(`  ${DOC_SIGNATURE} `), KEY)).not.toThrow();
   });
 
   it("accepts bytes, ArrayBuffer and a fetch Headers object", () => {

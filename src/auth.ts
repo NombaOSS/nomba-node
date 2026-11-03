@@ -110,10 +110,12 @@ export class TokenManager {
         return await this.#save(await this.#deps.refresh(cached.refreshToken));
       } catch (err) {
         const status = err instanceof ApiError ? err.httpStatus : null;
-        const clientError = status !== null && status >= 400 && status < 500;
+        // 429 is throttling, not a rejected refresh token: handle it like 5xx.
+        const clientError =
+          status !== null && status >= 400 && status < 500 && status !== 429;
         const nonSuccessCode = err instanceof ApiError && status !== null && status < 300;
         if (!clientError && !nonSuccessCode) {
-          // Network/5xx trouble: keep using a token that has not actually expired.
+          // Network/429/5xx trouble: keep using a token that has not actually expired.
           if (this.#expiryMs(cached) > this.#now()) return cached.accessToken;
           throw err;
         }

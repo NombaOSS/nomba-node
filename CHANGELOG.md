@@ -12,8 +12,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Resources: `accounts`, `virtualAccounts`, `checkout`, `transfers`, `transactions`, `terminals`, `directDebits`, `bills` (v2 purchase endpoints), `globalPayout` and `globalCollection`, with typed requests and responses.
 - Typed errors: `ApiError` with `AuthenticationError`, `PermissionDeniedError`, `NotFoundError`, `ValidationError`, `RateLimitError` and `ServerError`, plus `ConnectionError`, `TimeoutError`, `ConfigurationError` and `WebhookVerificationError`.
 - Automatic retries with exponential backoff for GET and token requests only. POST, PUT and DELETE are never retried.
-- `merchantTxRef` generated (UUID v4) for transfers and bill purchases when you don't pass one, and returned on the result. `checkout.chargeSavedCard` does the same with `order.orderReference`.
+- `merchantTxRef` generated (UUID v4) for transfers and bill purchases when you don't pass one, and returned on the result. `checkout.chargeSavedCard` does the same with `order.orderReference`. Errors from these calls carry the reference as `err.reference`, so you can requery after a timeout.
 - Path parameter validation that rejects empty values, `.`, `..` and `/`.
 - Auto-paging async iterators: `transactions.listAll`, `transactions.filterAll`, `transactions.listAllBankTransactions`, `accounts.listAllTerminals` and `virtualAccounts.listAll`.
-- Webhook verification (`verifyWebhook`, `Nomba.webhooks.verify`) with constant-time, case-insensitive comparison and optional timestamp tolerance.
+- Webhook verification (`verifyWebhook`, `Nomba.webhooks.verify`) with exact, constant-time signature comparison and optional timestamp tolerance.
 - `TransactionStatus` and `WebhookEventType` constants.

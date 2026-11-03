@@ -1,3 +1,4 @@
+import { attachErrorReference } from "../errors.js";
 import type { HttpClient, RequestOptions } from "../internal/http.js";
 import { encodePathSegment, isRecord, randomUUID } from "../internal/utils.js";
 
@@ -37,7 +38,14 @@ export abstract class Resource {
       body.merchantTxRef = await randomUUID();
     }
     const ref = body.merchantTxRef as string;
-    const data = await this.request<unknown>({ method: "POST", path, body });
+    let data: unknown;
+    try {
+      data = await this.request<unknown>({ method: "POST", path, body });
+    } catch (err) {
+      // The outcome may be unknown (timeout, 5xx): the caller needs the reference to requery.
+      attachErrorReference(err, { field: "merchantTxRef", value: ref });
+      throw err;
+    }
     return attachRef(data, "merchantTxRef", ref) as T & { merchantTxRef: string };
   }
 }

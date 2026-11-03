@@ -3,6 +3,7 @@ import {
   AuthenticationError,
   ConnectionError,
   InMemoryTokenStore,
+  RateLimitError,
   ServerError,
   type Token,
   type TokenStore,
@@ -136,6 +137,42 @@ describe("authentication", () => {
     await client(m, { tokenStore: store }).accounts.getParent();
     expect(m.apiCalls[0]!.headers.Authorization).toBe("Bearer still-valid");
     expect(m.callsTo("POST", "/v1/auth/token/refresh")).toHaveLength(3);
+  });
+
+  it("treats a 429 from refresh like a 5xx: keeps a still-valid token", async () => {
+    const store = storeWith({
+      accessToken: "still-valid",
+      refreshToken: "r",
+      expiresAt: new Date(Date.now() + 2 * MIN).toISOString(),
+    });
+    const limited = () => apiError(429, "slow down", { "Retry-After": "0" });
+    const m = new MockApi()
+      .on("POST", "/v1/auth/token/refresh", limited(), limited(), limited())
+      .on("GET", "/v1/accounts/parent", ok({}));
+    await client(m, { tokenStore: store }).accounts.getParent();
+    expect(m.apiCalls[0]!.headers.Authorization).toBe("Bearer still-valid");
+    expect(m.callsTo("POST", "/v1/auth/token/issue")).toHaveLength(0);
+    expect(store.value?.accessToken).toBe("still-valid");
+  });
+
+  it("treats a 429 from refresh like a 5xx: throws if the token has expired", async () => {
+    const store = storeWith({
+      accessToken: "expired",
+      refreshToken: "r",
+      expiresAt: new Date(Date.now() - MIN).toISOString(),
+    });
+    const limited = () => apiError(429, "slow down", { "Retry-After": "0" });
+    const m = new MockApi().on(
+      "POST",
+      "/v1/auth/token/refresh",
+      limited(),
+      limited(),
+      limited()
+    );
+    await expect(
+      client(m, { tokenStore: store }).accounts.getParent()
+    ).rejects.toBeInstanceOf(RateLimitError);
+    expect(m.callsTo("POST", "/v1/auth/token/issue")).toHaveLength(0);
   });
 
   it("throws when refresh hits a 5xx and the token has expired", async () => {

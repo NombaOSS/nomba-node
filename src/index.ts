@@ -10,6 +10,7 @@ export {
   AuthenticationError,
   ConfigurationError,
   ConnectionError,
+  type ErrorReference,
   NombaError,
   NotFoundError,
   PermissionDeniedError,

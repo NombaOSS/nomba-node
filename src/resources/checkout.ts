@@ -1,4 +1,4 @@
-import { ValidationError } from "../errors.js";
+import { attachErrorReference, ValidationError } from "../errors.js";
 import { isRecord, randomUUID, requireFields } from "../internal/utils.js";
 import type {
   CancelTransactionParams,
@@ -101,11 +101,18 @@ export class Checkout extends Resource {
       ref = order.orderReference as string;
       body.order = order;
     }
-    const data = await this.request<unknown>({
-      method: "POST",
-      path: "/v1/checkout/tokenized-card-payment",
-      body,
-    });
+    let data: unknown;
+    try {
+      data = await this.request<unknown>({
+        method: "POST",
+        path: "/v1/checkout/tokenized-card-payment",
+        body,
+      });
+    } catch (err) {
+      if (ref !== undefined)
+        attachErrorReference(err, { field: "orderReference", value: ref });
+      throw err;
+    }
     return (
       ref === undefined ? data : attachRef(data, "orderReference", ref)
     ) as ChargeSavedCardResult;

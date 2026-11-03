@@ -321,19 +321,34 @@ const t = await nomba.transfers.toWallet({ amount: 500, receiverAccountId: "..."
 console.log(t.merchantTxRef); // "3b241101-e2bb-4255-8caf-4136c566a962"
 ```
 
-Better: pass your own reference, store it before you send, and reuse it if you retry. Nomba then deduplicates, and you can always check the outcome:
+If the call throws, the error carries the reference that was sent, generated or yours, as `err.reference` (`{ field: "merchantTxRef", value }`). After a `TimeoutError`, `ConnectionError` or `ServerError` you don't know whether the money moved. Requery with `err.reference.value` before you retry, and retry only with the same reference:
 
 ```ts
-const merchantTxRef = `payout-${invoice.id}`;
+import { NombaError, TransactionStatus } from "@nombaoss/nomba-node";
+
 try {
-  await nomba.transfers.toBank({ ...details, merchantTxRef });
+  await nomba.transfers.toBank(details);
 } catch (err) {
-  // Outcome unknown: check before retrying with the same merchantTxRef.
-  const tx = await nomba.transactions.get({ merchantTxRef });
+  if (!(err instanceof NombaError) || !err.reference) throw err;
+  // Outcome unknown: check first.
+  const tx = await nomba.transactions.get({ merchantTxRef: err.reference.value });
+  if (tx.status !== TransactionStatus.SUCCESS) {
+    // Not delivered yet: wait for the webhook, or retry with the SAME reference.
+    // nomba.transfers.toBank({ ...details, merchantTxRef: err.reference.value })
+  }
 }
 ```
 
-`checkout.chargeSavedCard` has no `merchantTxRef` field; its reference is `order.orderReference`. The SDK generates that one the same way when you omit it, and returns it as `orderReference`. Global payout and collection calls take an `idempotencyKey`, which you set yourself.
+(`transactions.get` throws `NotFoundError` if Nomba never received the transfer; then retrying with the same reference is safe.)
+
+Better still: pass your own reference and store it before you send, so you can check the outcome even if your process crashes mid-request. Nomba deduplicates on it:
+
+```ts
+const merchantTxRef = `payout-${invoice.id}`;
+await nomba.transfers.toBank({ ...details, merchantTxRef });
+```
+
+`checkout.chargeSavedCard` has no `merchantTxRef` field; its reference is `order.orderReference`. The SDK generates that one the same way when you omit it, returns it as `orderReference`, and sets `err.reference` to `{ field: "orderReference", value }` on errors. Global payout and collection calls take an `idempotencyKey`, which you set yourself.
 
 ## Transaction statuses
 
@@ -406,7 +421,7 @@ app.post("/webhooks/nomba", express.raw({ type: "*/*" }), (req, res) => {
 
 **Pass the raw body.** Use `express.raw()` (or `await request.text()` with the Fetch API), not `express.json()`. If the body is parsed and serialised again, it can change and the signature will not match. `rawBody` can be a string, `Buffer`, `Uint8Array` or `ArrayBuffer`. `headers` can be Node's `req.headers` or a Fetch `Headers` object.
 
-- The signature is compared in constant time, ignoring letter case (Nomba's reference code does the same).
+- The signature is compared exactly (base64 is case-sensitive) and in constant time. Surrounding whitespace in the header is ignored.
 - `nomba-sig-value` is accepted if `nomba-signature` is absent. A `nomba-signature-algorithm` other than `HmacSHA256` is rejected.
 - `toleranceSeconds` (off by default) rejects events whose `nomba-timestamp` is more than that many seconds from now, which protects against replayed requests.
 

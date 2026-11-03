@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { type Nomba, ValidationError } from "../src/index.js";
-import { client, FAKE, MockApi, ok } from "./helpers.js";
+import {
+  ApiError,
+  ConnectionError,
+  type Nomba,
+  NombaError,
+  ServerError,
+  TimeoutError,
+  ValidationError,
+} from "../src/index.js";
+import { apiError, client, FAKE, json, MockApi, ok } from "./helpers.js";
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -1125,5 +1133,132 @@ describe("merchantTxRef idempotency", () => {
     } finally {
       if (original) Object.defineProperty(globalThis, "crypto", original);
     }
+  });
+});
+
+describe("errors from money-moving calls carry the reference", () => {
+  const hang = (call: { init: RequestInit }) =>
+    new Promise<Response>((_resolve, reject) => {
+      call.init.signal?.addEventListener("abort", () =>
+        reject(new DOMException("aborted", "AbortError"))
+      );
+    });
+
+  async function failure(p: Promise<unknown>): Promise<NombaError> {
+    const err = await p.catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NombaError);
+    return err as NombaError;
+  }
+
+  it("transfers.toBank timeout carries the generated merchantTxRef", async () => {
+    const m = new MockApi().on("POST", "/v2/transfers/bank", hang);
+    const err = await failure(
+      client(m, { timeout: 10 }).transfers.toBank({
+        amount: 1,
+        accountNumber: "1",
+        accountName: "A",
+        bankCode: "1",
+      })
+    );
+    expect(err).toBeInstanceOf(TimeoutError);
+    const sent = (m.apiCalls[0]!.body as { merchantTxRef: string }).merchantTxRef;
+    expect(sent).toMatch(UUID_V4);
+    expect(err.reference).toEqual({ field: "merchantTxRef", value: sent });
+    expect(m.callsTo("POST", "/v2/transfers/bank")).toHaveLength(1);
+  });
+
+  it("transfers.toBank 5xx carries the generated merchantTxRef", async () => {
+    const m = new MockApi().on(
+      "POST",
+      "/v2/transfers/bank",
+      apiError(502, "Bad gateway")
+    );
+    const err = await failure(
+      client(m).transfers.toBank({
+        amount: 1,
+        accountNumber: "1",
+        accountName: "A",
+        bankCode: "1",
+      })
+    );
+    expect(err).toBeInstanceOf(ServerError);
+    const sent = (m.apiCalls[0]!.body as { merchantTxRef: string }).merchantTxRef;
+    expect(err.reference).toEqual({ field: "merchantTxRef", value: sent });
+  });
+
+  it("a bills purchase timeout and 5xx carry the generated merchantTxRef", async () => {
+    const m = new MockApi()
+      .on("POST", "/v2/bill/topup", hang)
+      .on("POST", "/v2/bill/electricity", apiError(500));
+    const n = client(m, { timeout: 10 });
+    const t = await failure(
+      n.bills.buyAirtime({ amount: 1, phoneNumber: "1", network: "MTN" })
+    );
+    expect(t).toBeInstanceOf(TimeoutError);
+    expect(t.reference?.value).toBe(
+      (m.callsTo("POST", "/v2/bill/topup")[0]!.body as { merchantTxRef: string })
+        .merchantTxRef
+    );
+    const s = await failure(n.bills.buyElectricity({ disco: "d" }));
+    expect(s).toBeInstanceOf(ServerError);
+    expect(s.reference?.field).toBe("merchantTxRef");
+    expect(s.reference?.value).toBe(
+      (m.callsTo("POST", "/v2/bill/electricity")[0]!.body as { merchantTxRef: string })
+        .merchantTxRef
+    );
+  });
+
+  it("carries a caller-supplied reference, on connection errors and non-success codes", async () => {
+    const m = new MockApi()
+      .on("POST", "/v2/transfers/wallet", new TypeError("fetch failed"))
+      .on("POST", "/v2/bill/data", json({ code: "99", description: "Failed" }));
+    const n = client(m);
+    const c = await failure(
+      n.transfers.toWallet({ amount: 1, receiverAccountId: "r", merchantTxRef: "mine-7" })
+    );
+    expect(c).toBeInstanceOf(ConnectionError);
+    expect(c.reference).toEqual({ field: "merchantTxRef", value: "mine-7" });
+    const a = await failure(
+      n.bills.buyData({
+        productId: "p",
+        phoneNumber: "1",
+        network: "MTN",
+        merchantTxRef: "mine-8",
+      })
+    );
+    expect(a.constructor).toBe(ApiError);
+    expect(a.reference).toEqual({ field: "merchantTxRef", value: "mine-8" });
+    expect(Object.isFrozen(a.reference)).toBe(true);
+  });
+
+  it("checkout.chargeSavedCard errors carry the orderReference", async () => {
+    const m = new MockApi()
+      .on("POST", "/v1/checkout/tokenized-card-payment", apiError(503))
+      .on("POST", "/v1/checkout/tokenized-card-payment", apiError(400, "bad"));
+    const n = client(m);
+    const g = await failure(
+      n.checkout.chargeSavedCard({ order: { ...order }, tokenKey: "tok" })
+    );
+    const sent = (m.apiCalls[0]!.body as { order: { orderReference: string } }).order
+      .orderReference;
+    expect(g.reference).toEqual({ field: "orderReference", value: sent });
+    const c = await failure(
+      n.checkout.chargeSavedCard({
+        order: { ...order, orderReference: "ord-9" },
+        tokenKey: "tok",
+      })
+    );
+    expect(c).toBeInstanceOf(ValidationError);
+    expect(c.reference).toEqual({ field: "orderReference", value: "ord-9" });
+  });
+
+  it("other errors have no reference", async () => {
+    const m = new MockApi().on("GET", "/v1/accounts/parent", apiError(404));
+    const err = await failure(client(m).accounts.getParent());
+    expect(err.reference).toBeUndefined();
+    const v = await failure(
+      client(new MockApi()).transfers.toBank({ ...transfer, bankCode: "" })
+    );
+    expect(v.reference).toBeUndefined();
   });
 });

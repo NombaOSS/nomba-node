@@ -147,10 +147,10 @@ export function verifyWebhook(
   }
 
   const expected = computeWebhookSignature(event, timestamp, signingKey);
-  // Nomba compares case-insensitively: its documented sample signature differs
-  // from the computed one only in letter case.
-  const a = Buffer.from(expected.toLowerCase(), "utf8");
-  const b = Buffer.from(signature.trim().toLowerCase(), "utf8");
+  // Exact, constant-time comparison. Base64 is case-sensitive, so a signature
+  // that differs only in letter case is a different signature.
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(signature.trim(), "utf8");
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
     throw new WebhookVerificationError("Webhook signature does not match");
   }

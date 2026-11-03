@@ -17,10 +17,38 @@
  * Errors never carry credentials, tokens or request headers.
  */
 
+/** The idempotency reference sent with a money-moving request. */
+export interface ErrorReference {
+  /** Which request field held the reference. */
+  readonly field: "merchantTxRef" | "orderReference";
+  /** The value sent: yours, or the one the SDK generated. */
+  readonly value: string;
+}
+
 export class NombaError extends Error {
+  /**
+   * Set on errors from money-moving calls (`transfers.toBank`, `transfers.toWallet`,
+   * `bills.*` purchases, `checkout.chargeSavedCard`). After a timeout or connection
+   * error, requery with this reference before retrying, and retry with the same one.
+   */
+  readonly reference: ErrorReference | undefined;
+
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
     this.name = new.target.name;
+    this.reference = undefined;
+  }
+}
+
+/** Attach the idempotency reference to an error thrown by a money-moving call. */
+export function attachErrorReference(err: unknown, reference: ErrorReference): void {
+  if (err instanceof NombaError) {
+    Object.defineProperty(err, "reference", {
+      value: Object.freeze({ ...reference }),
+      enumerable: true,
+      writable: false,
+      configurable: true,
+    });
   }
 }
 
