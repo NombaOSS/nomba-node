@@ -1,8 +1,10 @@
 import {
   ApiError,
   type ApiErrorInit,
+  attachErrorReference,
   AuthenticationError,
   ConnectionError,
+  type ErrorReference,
   NotFoundError,
   PermissionDeniedError,
   RateLimitError,
@@ -22,10 +24,19 @@ export interface RequestOptions {
   path: string;
   query?: Query | undefined;
   body?: unknown;
-  /** Send without a bearer token (token issue/refresh). */
-  unauthenticated?: boolean;
-  /** Allow automatic retries for a non-GET request (token issue/refresh only). */
-  retryable?: boolean;
+  /**
+   * Token endpoint request:
+   * - `"obtain"` (issue/refresh): sent without a bearer token, retried like a GET,
+   *   and any 4xx other than 429 is an AuthenticationError.
+   * - `"revoke"`: an ordinary authenticated request.
+   * Both keep `data` out of error bodies, since it may hold tokens.
+   */
+  token?: "obtain" | "revoke";
+  /**
+   * Idempotency reference of a money-moving request: added to the returned data if
+   * missing, and attached to any error as `err.reference`.
+   */
+  reference?: ErrorReference;
 }
 
 export interface HttpClientConfig {
@@ -82,23 +93,35 @@ export class HttpClient {
 
   /** Make a request and return the unwrapped `data` of a successful envelope. */
   async request<T>(opts: RequestOptions): Promise<T> {
-    if (opts.unauthenticated || !this.#tokens) {
-      return (await this.#send(opts, undefined)) as T;
+    const { reference } = opts;
+    if (!reference) return (await this.#authorized(opts)) as T;
+    try {
+      return withReference(await this.#authorized(opts), reference) as T;
+    } catch (err) {
+      // The outcome may be unknown (timeout, 5xx): the caller needs the reference to requery.
+      attachErrorReference(err, reference);
+      throw err;
+    }
+  }
+
+  async #authorized(opts: RequestOptions): Promise<unknown> {
+    if (opts.token === "obtain" || !this.#tokens) {
+      return this.#send(opts, undefined);
     }
     const token = await this.#tokens.getAccessToken();
     try {
-      return (await this.#send(opts, token)) as T;
+      return await this.#send(opts, token);
     } catch (err) {
       if (!(err instanceof AuthenticationError) || err.httpStatus !== 401) throw err;
       // A 401 means the request was not processed, so retrying once is safe even for POST.
       await this.#tokens.invalidate(token);
       const fresh = await this.#tokens.getAccessToken();
-      return (await this.#send(opts, fresh)) as T;
+      return this.#send(opts, fresh);
     }
   }
 
   async #send(opts: RequestOptions, token: string | undefined): Promise<unknown> {
-    const retryable = opts.method === "GET" || opts.retryable === true;
+    const retryable = opts.method === "GET" || opts.token === "obtain";
     const maxAttempts = retryable ? this.#config.maxRetries + 1 : 1;
     const url = `${this.#config.baseUrl}${opts.path}${buildQuery(opts.query)}`;
     const headers: Record<string, string> = {
@@ -205,7 +228,7 @@ export class HttpClient {
           ? descriptionField
           : undefined,
       // Token endpoints: never keep a response body that might contain tokens.
-      body: opts.path.startsWith("/v1/auth/") ? redactAuthBody(res.body) : res.body,
+      body: opts.token ? redactTokenBody(res.body) : res.body,
       method: opts.method,
       path: opts.path,
     };
@@ -215,7 +238,6 @@ export class HttpClient {
 
 function errorFor(init: ApiErrorInit, headers: Headers, opts: RequestOptions): ApiError {
   const status = init.httpStatus ?? 0;
-  const isTokenRequest = opts.path.startsWith("/v1/auth/token/");
   if (status === 429) {
     return new RateLimitError({
       ...init,
@@ -228,7 +250,7 @@ function errorFor(init: ApiErrorInit, headers: Headers, opts: RequestOptions): A
     });
   }
   if (status >= 500) return new ServerError(init);
-  if (isTokenRequest && opts.unauthenticated) return new AuthenticationError(init);
+  if (opts.token === "obtain") return new AuthenticationError(init);
   if (status === 401) return new AuthenticationError(init);
   if (status === 403) return new PermissionDeniedError(init);
   if (status === 404) return new NotFoundError(init);
@@ -245,7 +267,19 @@ function parseJson(text: string): unknown {
   }
 }
 
-function redactAuthBody(body: unknown): unknown {
+/** Add the reference to successful data that doesn't already carry it. */
+function withReference(data: unknown, { field, value }: ErrorReference): unknown {
+  if (data === null || data === undefined) return { [field]: value };
+  if (
+    isRecord(data) &&
+    (data[field] === undefined || data[field] === null || data[field] === "")
+  ) {
+    return { ...data, [field]: value };
+  }
+  return data;
+}
+
+function redactTokenBody(body: unknown): unknown {
   if (!isRecord(body)) return body;
   const { data: _data, ...rest } = body;
   return rest;

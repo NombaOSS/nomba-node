@@ -9,7 +9,7 @@ import type {
   ListTerminalsParams,
   Terminal,
 } from "../types.js";
-import { Resource, seg } from "./base.js";
+import { Resource } from "./base.js";
 
 export class Accounts extends Resource {
   /** Parent account details. `GET /v1/accounts/parent` */
@@ -19,11 +19,10 @@ export class Accounts extends Resource {
 
   /** Balance of the parent account, or of a sub account. */
   async getBalance(params: GetBalanceParams = {}): Promise<Balance> {
-    const path =
-      params.subAccountId === undefined
-        ? "/v1/accounts/balance"
-        : `/v1/accounts/${seg(params.subAccountId, "subAccountId")}/balance`;
-    return this.request({ method: "GET", path });
+    return this.request({
+      method: "GET",
+      path: this.withSubAccount("/v1/accounts", params.subAccountId, "/balance"),
+    });
   }
 
   /** Sub account details by `accountId` or `accountRef` (exactly one). */
@@ -44,11 +43,11 @@ export class Accounts extends Resource {
   async listTerminals(params: ListTerminalsParams = {}): Promise<CursorPage<Terminal>> {
     const { subAccountId, ...query } = params;
     validateLimit(query.limit);
-    const path =
-      subAccountId === undefined
-        ? "/v1/accounts/terminals"
-        : `/v1/accounts/${seg(subAccountId, "subAccountId")}/terminals`;
-    return this.request({ method: "GET", path, query: { ...query } });
+    return this.request({
+      method: "GET",
+      path: this.withSubAccount("/v1/accounts", subAccountId, "/terminals"),
+      query: { ...query },
+    });
   }
 
   /** Every terminal, across pages: `for await (const t of nomba.accounts.listAllTerminals())`. */

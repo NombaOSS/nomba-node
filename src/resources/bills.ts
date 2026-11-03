@@ -32,10 +32,7 @@ export class Bills extends Resource {
       ["amount", "phoneNumber", "network"],
       "bills.buyAirtime"
     );
-    return this.withMerchantTxRef(
-      this.withSubAccount("/v2/bill/topup", options.subAccountId),
-      params
-    );
+    return this.withMerchantTxRef("/v2/bill/topup", params, options);
   }
 
   async buyData(
@@ -47,10 +44,7 @@ export class Bills extends Resource {
       ["productId", "phoneNumber", "network"],
       "bills.buyData"
     );
-    return this.withMerchantTxRef(
-      this.withSubAccount("/v2/bill/data", options.subAccountId),
-      params
-    );
+    return this.withMerchantTxRef("/v2/bill/data", params, options);
   }
 
   /** Data plans for a telco (e.g. `mtn`). The telco is lowercased. */
@@ -63,10 +57,7 @@ export class Bills extends Resource {
     params: BuyElectricityParams,
     options: SubAccountOption = {}
   ): Promise<BillPurchaseResult> {
-    return this.withMerchantTxRef(
-      this.withSubAccount("/v2/bill/electricity", options.subAccountId),
-      params
-    );
+    return this.withMerchantTxRef("/v2/bill/electricity", params, options);
   }
 
   /** Electricity distribution companies (discos). */
@@ -93,10 +84,7 @@ export class Bills extends Resource {
     params: PayCableTvParams,
     options: SubAccountOption = {}
   ): Promise<BillPurchaseResult> {
-    return this.withMerchantTxRef(
-      this.withSubAccount("/v2/bill/cabletv", options.subAccountId),
-      params
-    );
+    return this.withMerchantTxRef("/v2/bill/cabletv", params, options);
   }
 
   async listCableTvPlans(cableTvType: CableTvType): Promise<CableTvPlan[]> {
@@ -126,10 +114,7 @@ export class Bills extends Resource {
     params: FundBettingParams,
     options: SubAccountOption = {}
   ): Promise<BillPurchaseResult> {
-    return this.withMerchantTxRef(
-      this.withSubAccount("/v2/bill/betting", options.subAccountId),
-      params
-    );
+    return this.withMerchantTxRef("/v2/bill/betting", params, options);
   }
 
   async listBettingProviders(): Promise<BettingProvider[]> {

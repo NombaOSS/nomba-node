@@ -44,10 +44,7 @@ export class Transfers extends Resource {
       ["amount", "accountNumber", "accountName", "bankCode"],
       "transfers.toBank"
     );
-    return this.withMerchantTxRef(
-      this.withSubAccount("/v2/transfers/bank", options.subAccountId),
-      params
-    );
+    return this.withMerchantTxRef("/v2/transfers/bank", params, options);
   }
 
   /** Transfer to another Nomba wallet. Never retried automatically. */
@@ -60,9 +57,6 @@ export class Transfers extends Resource {
       ["amount", "receiverAccountId"],
       "transfers.toWallet"
     );
-    return this.withMerchantTxRef(
-      this.withSubAccount("/v2/transfers/wallet", options.subAccountId),
-      params
-    );
+    return this.withMerchantTxRef("/v2/transfers/wallet", params, options);
   }
 }

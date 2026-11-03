@@ -19,8 +19,8 @@ const REFERENCE_KEYS = [
 ] as const;
 
 export class Transactions extends Resource {
-  #accountsPath(subAccountId: string | undefined): string {
-    return this.withSubAccount("/v1/transactions/accounts", subAccountId);
+  #accountsPath(subAccountId: string | undefined, suffix = ""): string {
+    return this.withSubAccount("/v1/transactions/accounts", subAccountId, suffix);
   }
 
   /** One page of transactions on the parent account or a sub account. */
@@ -74,11 +74,11 @@ export class Transactions extends Resource {
       "transactions.get"
     );
     const { subAccountId, ...query } = params;
-    const path =
-      subAccountId === undefined
-        ? "/v1/transactions/accounts/single"
-        : `/v1/transactions/accounts/${seg(subAccountId, "subAccountId")}/single`;
-    return this.request({ method: "GET", path, query: { ...query } });
+    return this.request({
+      method: "GET",
+      path: this.#accountsPath(subAccountId, "/single"),
+      query: { ...query },
+    });
   }
 
   /** One page of credits/debits on the parent account. */

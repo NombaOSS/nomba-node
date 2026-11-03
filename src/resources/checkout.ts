@@ -1,4 +1,5 @@
-import { attachErrorReference, ValidationError } from "../errors.js";
+import { ValidationError } from "../errors.js";
+import type { RequestOptions } from "../internal/http.js";
 import { isRecord, randomUUID, requireFields } from "../internal/utils.js";
 import type {
   CancelTransactionParams,
@@ -29,7 +30,7 @@ import type {
   UpdateSavedCardEmailResult,
   UserSavedCards,
 } from "../types.js";
-import { attachRef, Resource, seg } from "./base.js";
+import { Resource, seg } from "./base.js";
 
 type Params = Record<string, unknown>;
 
@@ -92,30 +93,21 @@ export class Checkout extends Resource {
   async chargeSavedCard(params: ChargeSavedCardParams): Promise<ChargeSavedCardResult> {
     requireFields(params as unknown as Params, ["tokenKey"], "checkout.chargeSavedCard");
     const body: Params = { ...params };
-    let ref: string | undefined;
+    let reference: RequestOptions["reference"];
     if (isRecord(params.order)) {
       const order: Params = { ...params.order };
       if (typeof order.orderReference !== "string" || order.orderReference === "") {
         order.orderReference = await randomUUID();
       }
-      ref = order.orderReference as string;
+      reference = { field: "orderReference", value: order.orderReference as string };
       body.order = order;
     }
-    let data: unknown;
-    try {
-      data = await this.request<unknown>({
-        method: "POST",
-        path: "/v1/checkout/tokenized-card-payment",
-        body,
-      });
-    } catch (err) {
-      if (ref !== undefined)
-        attachErrorReference(err, { field: "orderReference", value: ref });
-      throw err;
-    }
-    return (
-      ref === undefined ? data : attachRef(data, "orderReference", ref)
-    ) as ChargeSavedCardResult;
+    return this.request({
+      method: "POST",
+      path: "/v1/checkout/tokenized-card-payment",
+      body,
+      reference,
+    });
   }
 
   /** Saved cards, filtered by customer email and/or date range (page-numbered). */

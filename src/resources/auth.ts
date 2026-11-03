@@ -24,6 +24,7 @@ export class AuthResource extends Resource {
         method: "POST",
         path: "/v1/auth/token/revoke",
         body: { clientId: this.#clientId, access_token: token.accessToken },
+        token: "revoke",
       });
     } finally {
       await this.#tokens.clear();

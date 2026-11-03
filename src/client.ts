@@ -177,16 +177,14 @@ export class Nomba {
             client_id: clientId,
             client_secret: clientSecret,
           },
-          unauthenticated: true,
-          retryable: true,
+          token: "obtain",
         }),
       refresh: (refreshToken) =>
         http.request<TokenResponse>({
           method: "POST",
           path: "/v1/auth/token/refresh",
           body: { grant_type: "refresh_token", refresh_token: refreshToken },
-          unauthenticated: true,
-          retryable: true,
+          token: "obtain",
         }),
     });
     http.setTokenManager(tokens);

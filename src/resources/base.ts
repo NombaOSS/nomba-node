@@ -1,6 +1,6 @@
-import { attachErrorReference } from "../errors.js";
 import type { HttpClient, RequestOptions } from "../internal/http.js";
-import { encodePathSegment, isRecord, randomUUID } from "../internal/utils.js";
+import { encodePathSegment, randomUUID } from "../internal/utils.js";
+import type { SubAccountOption } from "../types.js";
 
 export interface ResourceContext {
   http: HttpClient;
@@ -18,47 +18,39 @@ export abstract class Resource {
     return this.ctx.http.request<T>(opts);
   }
 
-  /** `path` + `/{subAccountId}` when a sub account is given. */
-  protected withSubAccount(path: string, subAccountId: string | undefined): string {
-    return subAccountId === undefined
-      ? path
-      : `${path}/${encodePathSegment(subAccountId, "subAccountId")}`;
+  /** `path` + `/{subAccountId}` (when given) + `suffix`. */
+  protected withSubAccount(
+    path: string,
+    subAccountId: string | undefined,
+    suffix = ""
+  ): string {
+    const sub =
+      subAccountId === undefined
+        ? ""
+        : `/${encodePathSegment(subAccountId, "subAccountId")}`;
+    return `${path}${sub}${suffix}`;
   }
 
   /**
-   * Money-moving POST with a `merchantTxRef`: generate one if missing, and return
-   * it on the result so the caller can requery.
+   * Money-moving POST with a `merchantTxRef`: generate one if missing. The request
+   * layer returns it on the result and attaches it to any error.
    */
   protected async withMerchantTxRef<T>(
     path: string,
-    params: object
+    params: object,
+    options: SubAccountOption = {}
   ): Promise<T & { merchantTxRef: string }> {
     const body = { ...params } as Record<string, unknown>;
     if (typeof body.merchantTxRef !== "string" || body.merchantTxRef === "") {
       body.merchantTxRef = await randomUUID();
     }
-    const ref = body.merchantTxRef as string;
-    let data: unknown;
-    try {
-      data = await this.request<unknown>({ method: "POST", path, body });
-    } catch (err) {
-      // The outcome may be unknown (timeout, 5xx): the caller needs the reference to requery.
-      attachErrorReference(err, { field: "merchantTxRef", value: ref });
-      throw err;
-    }
-    return attachRef(data, "merchantTxRef", ref) as T & { merchantTxRef: string };
+    return this.request({
+      method: "POST",
+      path: this.withSubAccount(path, options.subAccountId),
+      body,
+      reference: { field: "merchantTxRef", value: body.merchantTxRef as string },
+    });
   }
-}
-
-export function attachRef(data: unknown, key: string, ref: string): unknown {
-  if (isRecord(data)) {
-    if (data[key] === undefined || data[key] === null || data[key] === "") {
-      return { ...data, [key]: ref };
-    }
-    return data;
-  }
-  if (data === null || data === undefined) return { [key]: ref };
-  return data;
 }
 
 export const seg = encodePathSegment;
