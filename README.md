@@ -1,4 +1,9 @@
-# nomba-node
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/NombaOSS/nomba-node/main/.github/assets/banner-dark.svg">
+  <img alt="Nomba Node.js SDK" src="https://raw.githubusercontent.com/NombaOSS/nomba-node/main/.github/assets/banner-light.svg" width="100%">
+</picture>
+
+# Nomba Node.js SDK
 
 TypeScript and Node.js SDK for the [Nomba](https://nomba.com) payments API.
 
@@ -34,6 +39,16 @@ console.log(balance.amount, balance.currency);
 CommonJS: `const { Nomba } = require("@nombaoss/nomba-node");`
 
 Get sandbox credentials from your Nomba dashboard. More examples are in [`examples/`](examples).
+
+## Building with an AI coding agent?
+
+Install the [Nomba agent skills](https://github.com/NombaOSS/skills) so Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI and other agents write Nomba integrations the safe way: idempotency references, requery on timeouts, refunds only when final, and webhook verification.
+
+```bash
+npx skills add NombaOSS/skills
+```
+
+In Claude Code you can also use `/plugin marketplace add NombaOSS/skills` and then `/plugin install nomba@nomba`.
 
 ## Configuration
 
