@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Dev tooling only, no change to the published package: vitest 5, tsup 9, eslint 10 and Node 22 type definitions, which clears the open Dependabot security alerts (all in dev dependencies). CI runs the vitest suite on Node 22 and 24 and, on every supported Node version (18 to 24), installs the packed package into an empty app and runs `scripts/smoke.mjs` and `scripts/smoke.cjs` against it.
+
 ## [0.1.1] - 2026-11-04
 
 ### Fixed
