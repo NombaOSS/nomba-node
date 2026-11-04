@@ -15,9 +15,9 @@ const app = express();
 app.post("/webhooks/nomba", express.raw({ type: "*/*" }), (req, res) => {
   let event;
   try {
-    event = verifyWebhook(req.body as Buffer, req.headers, signingKey, {
-      toleranceSeconds: 300, // reject events older than 5 minutes
-    });
+    // No toleranceSeconds: Nomba doesn't document whether retries get a fresh
+    // timestamp, so a tolerance could reject legitimate retries. Dedupe on requestId.
+    event = verifyWebhook(req.body as Buffer, req.headers, signingKey);
   } catch (err) {
     if (err instanceof WebhookVerificationError) {
       res.status(401).send("invalid signature");
