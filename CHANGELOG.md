@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Documentation
+
+- Webhook docs and examples no longer recommend a timestamp tolerance (previously 300 s): Nomba doesn't document whether retries get a fresh `nomba-timestamp`, so a tolerance could reject legitimate retries. Deduplicate on `requestId` instead. The docs also note that the amount, `orderReference`, `merchantTxRef` and `tokenKey` aren't signed, so money decisions should be confirmed with `transactions.get`.
+
 ### Changed
 
 - Dev tooling only, no change to the published package: vitest 5, tsup 9, eslint 10 and Node 22 type definitions, which clears the open Dependabot security alerts (all in dev dependencies). CI runs the vitest suite on Node 22 and 24 and, on every supported Node version (18 to 24), installs the packed package into an empty app and runs `scripts/smoke.mjs` and `scripts/smoke.cjs` against it.
