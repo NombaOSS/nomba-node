@@ -1,6 +1,6 @@
 {
   "name": "@nombaoss/nomba-node",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Official-quality TypeScript/Node SDK for the Nomba payments API",
   "license": "MIT",
   "type": "module",
