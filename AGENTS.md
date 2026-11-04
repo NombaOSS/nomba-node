@@ -14,6 +14,10 @@ TypeScript/Node SDK for the Nomba API (`@nombaoss/nomba-node`). Zero runtime dep
 
 Never publish, create tags or Releases by hand; see `RELEASING.md`.
 
+## Runtime support
+
+The SDK supports Node >= 18, but the dev tools need Node 22+. Run them on Node 22 or 24. CI covers Node 18 and 20 with `scripts/smoke.mjs` / `scripts/smoke.cjs` against the packed tarball; extend those scripts when a runtime behaviour must be checked on old Node.
+
 ## Before pushing
 
 `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:coverage && npm run build`
