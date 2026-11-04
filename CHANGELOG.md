@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-11-04
+
+### Fixed
+
+- `repository.url` in `package.json` uses the `git+https://` form npm expects, so npm no longer rewrites it on publish.
+
+### Changed
+
+- First release published from GitHub Actions through npm trusted publishing, with provenance.
+
 ## [0.1.0] - 2026-11-03
 
 ### Added

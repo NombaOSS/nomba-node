@@ -1,6 +1,6 @@
 {
   "name": "@nombaoss/nomba-node",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Official-quality TypeScript/Node SDK for the Nomba payments API",
   "license": "MIT",
   "type": "module",
@@ -39,7 +39,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/NombaOSS/nomba-node.git"
+    "url": "git+https://github.com/NombaOSS/nomba-node.git"
   },
   "homepage": "https://github.com/NombaOSS/nomba-node",
   "bugs": {
