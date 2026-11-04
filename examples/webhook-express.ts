@@ -27,6 +27,8 @@ app.post("/webhooks/nomba", express.raw({ type: "*/*" }), (req, res) => {
   }
 
   if (event.event_type === WebhookEventType.PAYMENT_SUCCESS) {
+    // The signature doesn't cover the amount or orderReference: before fulfilling,
+    // confirm with nomba.transactions.get({ orderReference }) and check the amount.
     console.log(`Paid: ${event.data.transaction.transactionAmount} (${event.requestId})`);
   }
   // Respond quickly; do slow work in a queue. Handle duplicates by requestId.
