@@ -5,6 +5,9 @@
 
 # Nomba Node.js SDK
 
+> [!WARNING]
+> **This package is deprecated and this repository is archived.** The official Node.js SDK is now [`@nomba/node-sdk`](https://www.npmjs.com/package/@nomba/node-sdk), developed at [NombaOSS/nomba-node-sdk](https://github.com/NombaOSS/nomba-node-sdk). `@nombaoss/nomba-node` will receive no further updates or security fixes. The two SDKs have different APIs, so follow the new SDK's README when migrating.
+
 TypeScript and Node.js SDK for the [Nomba](https://nomba.com) payments API.
 
 [![CI](https://github.com/NombaOSS/nomba-node/actions/workflows/ci.yml/badge.svg)](https://github.com/NombaOSS/nomba-node/actions/workflows/ci.yml)
